@@ -395,5 +395,14 @@ public class LoadedPackData(string name, string dataPath) : ILoadedModAndResourc
         var dllPath = Path.ChangeExtension(Path.Join(ExtractedZipPath, Name), "dll");
         if (File.Exists(dllPath))
             Assembly = Assembly.LoadFrom(dllPath);
+        else // For zips the dll can be named anything ever
+        {
+            var possibleFiles = Directory.EnumerateFiles(ExtractedZipPath, "*.dll");
+            foreach (var possibleDllPath in possibleFiles)
+            {
+                Assembly = Assembly.LoadFrom(possibleDllPath);
+                break;
+            }
+        }
     }
 }
