@@ -547,6 +547,9 @@ public partial class Connector : ReactiveObject
             startInfo.EnvironmentVariables[k] = v;
         }
 
+        if (_cfg.GetCVar(SanabiCVars.HarmonyDebug))
+            EnvVar("HARMONY_DEBUG", "1");
+
         EnvVar("SS14_LOADER_CONTENT_DB", LauncherPaths.PathContentDb);
         EnvVar("SS14_LOADER_CONTENT_VERSION", launchInfo.Version.ToString());
         EnvVar("SS14_LOADER_OVERLAY_ZIP", launchInfo.OverlayZip);

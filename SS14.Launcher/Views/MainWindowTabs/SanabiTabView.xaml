@@ -228,6 +228,30 @@
                    Text="Forcefully disable transitioning images and use acrylic blur background on the homepage."
                    Margin="8"/>
 
+        <!-- DEBUG START -->
+
+        <TextBlock HorizontalAlignment="Center"
+                   Text="Debug"
+                   Classes="NanoHeading"/>
+
+        <CheckBox VerticalAlignment="Center"
+                  Margin="4"
+                  IsChecked="{Binding HarmonyDebug}"
+                  Content="Debug mode"/>
+        <TextBlock VerticalAlignment="Center"
+                   TextWrapping="Wrap"
+                   Text="Debug mode for Harmony. If on, a dump of IL logs will be generated and added to your desktop when the game is launched?"
+                   Margin="8"/>
+
+        <CheckBox VerticalAlignment="Center"
+                  Margin="4"
+                  IsChecked="{Binding WaitForDebugger}"
+                  Content="Wait for debugger to attach before starting game"/>
+        <TextBlock VerticalAlignment="Center"
+                   TextWrapping="Wrap"
+                   Text="After launching the game process, should the game wait for a debugger to attach before doing anything? Only use if you know what you're doing."
+                   Margin="8"/>
+
       </StackPanel>
     </DockPanel>
   </ScrollViewer>

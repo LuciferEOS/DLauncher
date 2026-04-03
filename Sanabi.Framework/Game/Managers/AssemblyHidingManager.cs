@@ -14,9 +14,10 @@ namespace Sanabi.Framework.Game.Managers;
 public static class AssemblyHidingManager
 {
     /// <summary>
-    ///     Assemblies hidden from view.
+    ///     Assembly names hidden from view.
+    ///         Bool is whether to match exact name (false) or any string that contains the name (true).
     /// </summary>
-    private static readonly List<Assembly> _hiddenAssemblies = new();
+    private static readonly Dictionary<string, bool> _hiddenAssemblies = new();
 
     /*
     See: https://github.com/space-wizards/RobustToolbox/blob/9e8f7092ea32a2653776292703d20320f3f34cf5/Robust.Shared/ContentPack/Sandbox.yml#L15
@@ -33,48 +34,36 @@ public static class AssemblyHidingManager
     */
     private static readonly string[] _contentNamespaces = ["Robust", "Content", "OpenDreamShared"];
 
-    public static void Initialise()
-    {
-        HarmonyManager.Initialise();
-    }
-
     public static void HideBasicAssemblies()
     {
-        HideAssembly("Harmony", once: false);
-        HideAssembly("Sanabi", once: false);
+        HideAssembly("Harmony", exact: false);
+        HideAssembly("Sanabi", exact: false);
 
-        HideAssembly("MonoMod", once: false);
+        HideAssembly("MonoMod", exact: false);
 
-        HideAssembly("System.Reflection", once: true);
-        HideAssembly("System.Reflection.Emit", once: true);
+        HideAssembly("System.Reflection", exact: true);
+        HideAssembly("System.Reflection.Emit", exact: true);
     }
 
     /// <summary>
     ///     Hides the assemblies whose <see cref="Assembly.FullName"/>
     ///         matches the given string.
     /// </summary>
-    /// <param name="once">Only hide the first matching one?</param>
-    public static void HideAssembly(string identifier, bool once = false)
+    /// <param name="exact">If false, then only hides assemblies whose name is exactly this id. Otherwise, hides those whose name contains this id.</param>
+    public static void HideAssembly(string identifier, bool exact = false)
     {
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-        foreach (var assembly in assemblies)
-        {
-            if (assembly.FullName is not { } fullName ||
-                !fullName.Contains(identifier))
-                continue;
+        if (_hiddenAssemblies.ContainsKey(identifier))
+            return;
 
-            HideAssembly(assembly);
-            if (once)
-                break;
-        }
+        _hiddenAssemblies[identifier] = exact;
     }
 
     /// <summary>
     ///     Hides an assembly.
     /// </summary>
-    public static void HideAssembly(Assembly assembly)
+    public static void HideAssembly(Assembly assembly, bool exact = false)
     {
-        _hiddenAssemblies.Add(assembly);
+        HideAssembly(assembly.GetName().FullName, exact: exact);
     }
 
     public static void PatchDetectionVectors()
@@ -96,26 +85,33 @@ public static class AssemblyHidingManager
             );
     }
 
-    private static AssemblyName[] HiddenAssemblyNames()
+    private static bool ShouldHideAssembly(string ourAssemblyName)
     {
-        var list = new List<AssemblyName>();
-        foreach (var hiddenAssembly in _hiddenAssemblies)
-            list.Add(hiddenAssembly.GetName());
+        foreach (var (hiddenAssemblyName, exact) in _hiddenAssemblies)
+        {
+            if (exact)
+            {
+                if (ourAssemblyName == hiddenAssemblyName)
+                    return true;
+            }
+            else
+            {
+                if (ourAssemblyName.Contains(hiddenAssemblyName))
+                    return true;
+            }
+        }
 
-        return [.. list];
+        return false;
     }
 
     private static AssemblyName[] HideHiddenAssemblyNames(AssemblyName[] names)
-    {
-        var hiddenNames = HiddenAssemblyNames();
-        return [.. names.Where(assemblyName => !hiddenNames.Contains(assemblyName))];
-    }
+        => [.. names.Where(assemblyName => !ShouldHideAssembly(assemblyName.FullName))];
 
     private static IEnumerable<Type> HideHiddenTypes(Type[] unhiddenTypes)
     {
         foreach (var type in unhiddenTypes)
         {
-            if (_hiddenAssemblies.Contains(type.Assembly))
+            if (ShouldHideAssembly(type.Assembly.GetName().FullName))
                 continue;
 
             yield return type;
@@ -145,13 +141,13 @@ public static class AssemblyHidingManager
                 __result = HideHiddenAssemblyNames(assemblyNames);
                 break;
             case Assembly[] originalAssemblies:
-                __result = originalAssemblies.Where(assembly => !_hiddenAssemblies.Contains(assembly)).ToArray();
+                __result = originalAssemblies.Where(assembly => !ShouldHideAssembly(assembly.GetName().FullName)).ToArray();
                 break;
             case Type[] types:
                 __result = HideHiddenTypes(types).ToArray();
                 break;
             case IEnumerable<Assembly> assemblyEnumerable:
-                __result = assemblyEnumerable.Where(assembly => !_hiddenAssemblies.Contains(assembly));
+                __result = assemblyEnumerable.Where(assembly => !ShouldHideAssembly(assembly.GetName().FullName));
                 break;
             case IEnumerable<AssemblyLoadContext> assemblyLoadContextEnumerable:
                 __result = assemblyLoadContextEnumerable.Where(context => context.Name != "Assembly.Load(byte[], ...)");
@@ -174,11 +170,11 @@ public static class AssemblyHidingManager
                 method.DeclaringType == null)
                 continue;
 
-            if (_hiddenAssemblies.Contains(method.DeclaringType.Assembly))
-                return true;
+            if (!ShouldHideAssembly(method.DeclaringType.Assembly.GetName().FullName))
+                return false;
         }
 
-        return false;
+        return true;
     }
 
     /// <returns>Whether the stack-trace of this method's call-site was ever in any Robust/Content/OpenDreamShared namespace.</returns>

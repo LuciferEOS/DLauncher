@@ -27,6 +27,8 @@ public record struct SanabiConfig()
 
     public bool LoadExternalMods = false;
 
+    public bool WaitForDebugger = false;
+
     public long LoadedExternalModsFlags = 0L;
 }
 
@@ -47,6 +49,7 @@ public static class SanabiConfigExtensions
         config.HwidPatchSeed = BitConverter.ToUInt64(BitConverter.GetBytes(dataManager.GetActiveAccountCVarOrDefault(SanabiAccountCVars.SpoofingSeed)), 0);
         config.LoadInternalMods = dataManager.GetCVar(SanabiCVars.LoadInternalMods);
         config.LoadExternalMods = dataManager.GetCVar(SanabiCVars.LoadExternalMods);
+        config.WaitForDebugger = dataManager.GetCVar(SanabiCVars.WaitForDebugger);
         config.LoadedExternalModsFlags = dataManager.GetCVar(SanabiCVars.LoadedExternalModsFlags);
 
         return config;

@@ -34,6 +34,16 @@ public static partial class SanabiCVars
     public static readonly CVarDef<bool> LoadExternalMods = CVarDef.Create("LoadExternalMods", false);
 
     /// <summary>
+    ///     Use harmony on debug mode on next load?
+    /// </summary>
+    public static readonly CVarDef<bool> HarmonyDebug = CVarDef.Create("HarmonyDebug", false);
+
+    /// <summary>
+    ///     When launching, should we wait for a debugger to attach to the process?
+    /// </summary>
+    public static readonly CVarDef<bool> WaitForDebugger = CVarDef.Create("WaitForDebugger", false);
+
+    /// <summary>
     ///     Map of flags representing which external mods were loaded.
     ///         First loaded mod is on the right-most bit.
     /// </summary>

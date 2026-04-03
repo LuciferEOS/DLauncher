@@ -40,6 +40,10 @@ public static class LauncherPaths
     public static readonly string SanabiExtractedModZipsPath = Path.Combine(SanabiDirPath, "extracted_mod_zips");
     public static readonly string SanabiModDataPath = Path.Combine(SanabiDirPath, "mod_specific_data");
 
+
+    public static readonly string SanabiIlParentPath = SanabiDirPath;
+    public static readonly string SanabiIlPath = Path.Combine(SanabiIlParentPath, "il_dump.txt");
+
     public static void CreateDirs()
     {
         Ensure(DirLogs);

@@ -8,6 +8,7 @@ using System.Collections.ObjectModel;
 using Sanabi.Framework.Game.Managers;
 using System;
 using ReactiveUI;
+using System.IO;
 
 namespace SS14.Launcher.ViewModels.MainWindowTabs;
 
@@ -188,6 +189,18 @@ public class SanabiTabViewModel : MainWindowTabViewModel
 
             MainWindowViewModel.SetFancyBackground(value);
         }
+    }
+
+    public bool HarmonyDebug
+    {
+        get => Cfg.GetCVar(SanabiCVars.HarmonyDebug);
+        set => SetAndCommitCvar(SanabiCVars.HarmonyDebug, value);
+    }
+
+    public bool WaitForDebugger
+    {
+        get => Cfg.GetCVar(SanabiCVars.WaitForDebugger);
+        set => SetAndCommitCvar(SanabiCVars.WaitForDebugger, value);
     }
 
     /// <summary>

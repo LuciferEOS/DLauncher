@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
+using System.Threading;
 using NSec.Cryptography;
 using Robust.LoaderApi;
 using Sanabi.Framework.Data;
@@ -79,16 +81,22 @@ internal class Program
                 PatchEntryAttributeManager.ProcessRunLevel(PatchRunLevel.Content);
         };
 
+        if (SanabiConfig.ProcessConfig.WaitForDebugger)
+        {
+            Console.WriteLine("Waiting for debugger to attach...");
+            while (!Debugger.IsAttached)
+            {
+                Thread.Sleep(100);
+            }
+            Console.WriteLine("Debugger attached!");
+        }
+
+        var zov = Environment.GetEnvironmentVariable("HARMONY_DEBUG");
+
         if (SanabiConfig.ProcessConfig.PatchRunLevel.HasFlag(PatchRunLevel.Engine) &&
             AssemblyManager.TryGetAssembly("Robust.Client", out _))
         {
             HarmonyManager.Initialise();
-
-            AssemblyHidingManager.Initialise();
-            AssemblyHidingManager.HideBasicAssemblies();
-            AssemblyHidingManager.PatchDetectionVectors();
-
-            HarmonyManager.BypassAnticheat();
 
             var modloader = ReflectionManager.GetTypeByQualifiedName("Robust.Shared.ContentPack.ModLoader");
             PatchHelpers.PatchPrefixFalse(modloader.GetMethod("SetUseLoadContext")!);
@@ -98,6 +106,10 @@ internal class Program
 
             AssemblyManager.QueryAssemblies();
             AssemblyManager.Subscribe();
+
+            // hide assemblies after atleast loading engine mods
+            AssemblyHidingManager.HideBasicAssemblies();
+            AssemblyHidingManager.PatchDetectionVectors();
         }
 
         // Console.WriteLine("lsasm dump:");
