@@ -1,5 +1,8 @@
 SanabiLauncher is a fork of the launcher for SS14.
 
+TODO:
+- [ ] API for mods to evade screengrabbing measures
+
 Features include:
 - Patchloader, with mod template here https://github.com/LaCumbiaDelCoronavirus/TemplateSanabiMod
 - Compatible with [Marseyloader](https://github.com/ValidHunters/Marseyloader) patches [(example here)](https://github.com/ValidHunters/SubversionExamplePatch)
