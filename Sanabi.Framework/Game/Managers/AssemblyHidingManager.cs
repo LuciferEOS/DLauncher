@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using HarmonyLib;
+using Sanabi.Framework.Misc;
 using Sanabi.Framework.Patching;
 
 namespace Sanabi.Framework.Game.Managers;
@@ -44,7 +45,7 @@ public static class AssemblyHidingManager
     ```
     */
     private static readonly string[] _contentNamespaces = ["Robust", "Content", "OpenDreamShared"];
-    private static readonly string[] _engineNamespaces = ["Robust.Client", "Robust.Shared"];
+    private static readonly string[] _engineNamespaces = ["Robust.Client", "Robust.Shared", "System.Private.CoreLib"];
 
     public static void HideBasicAssemblies()
     {
@@ -229,12 +230,15 @@ public static class AssemblyHidingManager
             if (OverridenCallsites.Contains(methodInfo))
                 return true;
 
-            if (!onlyInEngine && EngineOverridenCallsites.Contains(methodInfo))
+            if (EngineOverridenCallsites.Contains(methodInfo))
                 onlyInEngine = true;
 
             var assemblyName = declaringType.Assembly.GetName().Name ?? "";
-            if (_engineNamespaces.Contains(assemblyName))
+            if (onlyInEngine && !_engineNamespaces.Contains(assemblyName))
+            {
+                SanabiLogger.LogWarn($"CUR-LEFTUS: {assemblyName}");
                 wasOutsideEngine = true;
+            }
 
             if (ShouldHideAssembly(assemblyName))
                 return true;
