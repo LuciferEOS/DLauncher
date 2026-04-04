@@ -240,7 +240,7 @@
                   Content="Debug mode"/>
         <TextBlock VerticalAlignment="Center"
                    TextWrapping="Wrap"
-                   Text="Debug mode for Harmony. If on, a dump of IL logs will be generated and added to your desktop when the game is launched?"
+                   Text="Debug mode for Harmony. If on, a dump of IL logs will be generated and added to your desktop when the game is launched."
                    Margin="8"/>
 
         <CheckBox VerticalAlignment="Center"

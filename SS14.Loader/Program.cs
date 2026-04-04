@@ -75,23 +75,22 @@ internal class Program
 
         SanabiConfig.ProcessConfig = IpcManager.RunStructPipeClient<SanabiConfig>(IpcManager.SanabiIpcName);
 
-        var contentRunLevelAct = () =>
+        static void ContentRunLevelAct()
         {
-            if (SanabiConfig.ProcessConfig.PatchRunLevel.HasFlag(PatchRunLevel.Content))
-                PatchEntryAttributeManager.ProcessRunLevel(PatchRunLevel.Content);
-        };
+            if (!SanabiConfig.ProcessConfig.PatchRunLevel.HasFlag(PatchRunLevel.Content))
+                return;
+
+            PatchEntryAttributeManager.ProcessRunLevel(PatchRunLevel.Content);
+        }
 
         if (SanabiConfig.ProcessConfig.WaitForDebugger)
         {
             Console.WriteLine("Waiting for debugger to attach...");
             while (!Debugger.IsAttached)
-            {
                 Thread.Sleep(100);
-            }
+
             Console.WriteLine("Debugger attached!");
         }
-
-        var zov = Environment.GetEnvironmentVariable("HARMONY_DEBUG");
 
         if (SanabiConfig.ProcessConfig.PatchRunLevel.HasFlag(PatchRunLevel.Engine) &&
             AssemblyManager.TryGetAssembly("Robust.Client", out _))
@@ -101,15 +100,15 @@ internal class Program
             var modloader = ReflectionManager.GetTypeByQualifiedName("Robust.Shared.ContentPack.ModLoader");
             PatchHelpers.PatchPrefixFalse(modloader.GetMethod("SetUseLoadContext")!);
 
+            // Hide assemblies
+            AssemblyHidingManager.HideBasicAssemblies();
+            AssemblyHidingManager.PatchDetectionVectors();
+
             PatchEntryAttributeManager.ProcessRunLevel(PatchRunLevel.Engine);
-            AssemblyManager.OnAssembliesFulfilled += contentRunLevelAct;
+            AssemblyManager.OnAssembliesFulfilled += ContentRunLevelAct;
 
             AssemblyManager.QueryAssemblies();
             AssemblyManager.Subscribe();
-
-            // hide assemblies after atleast loading engine mods
-            AssemblyHidingManager.HideBasicAssemblies();
-            AssemblyHidingManager.PatchDetectionVectors();
         }
 
         // Console.WriteLine("lsasm dump:");
@@ -162,7 +161,7 @@ internal class Program
         finally
         {
             AssemblyManager.Unsubscribe();
-            AssemblyManager.OnAssembliesFulfilled -= contentRunLevelAct;
+            AssemblyManager.OnAssembliesFulfilled -= ContentRunLevelAct;
 
             contentApi?.Dispose();
             overlayApi?.Dispose();

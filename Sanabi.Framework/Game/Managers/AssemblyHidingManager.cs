@@ -17,7 +17,12 @@ public static class AssemblyHidingManager
     ///     Assembly names hidden from view.
     ///         Bool is whether to match exact name (false) or any string that contains the name (true).
     /// </summary>
-    private static readonly Dictionary<string, bool> _hiddenAssemblies = new();
+    private static readonly Dictionary<string, bool> _hiddenAssemblies = [];
+
+    /// <summary>
+    ///     Callsites that will be treated as if theyre in a hidden assembly.
+    /// </summary>
+    public static readonly HashSet<MethodInfo> OverridenCallsites = [];
 
     /*
     See: https://github.com/space-wizards/RobustToolbox/blob/9e8f7092ea32a2653776292703d20320f3f34cf5/Robust.Shared/ContentPack/Sandbox.yml#L15
@@ -41,7 +46,7 @@ public static class AssemblyHidingManager
 
         HideAssembly("MonoMod", exact: false);
 
-        HideAssembly("System.Reflection", exact: true);
+        HideAssembly("SS14.Common", exact: true);
         HideAssembly("System.Reflection.Emit", exact: true);
     }
 
@@ -59,6 +64,14 @@ public static class AssemblyHidingManager
     }
 
     /// <summary>
+    ///     Unhides the given assembly by ID.
+    /// </summary>
+    public static void UnhideAssembly(string identifier)
+    {
+        _hiddenAssemblies.Remove(identifier);
+    }
+
+    /// <summary>
     ///     Hides an assembly.
     /// </summary>
     public static void HideAssembly(Assembly assembly, bool exact = false)
@@ -69,11 +82,13 @@ public static class AssemblyHidingManager
     public static void PatchDetectionVectors()
     {
         MethodInfo?[] methods = [
-            typeof(AppDomain).GetMethod(nameof(AppDomain.GetAssemblies)),
-            typeof(AssemblyLoadContext).GetProperty("Assemblies")?.GetGetMethod(),
-            typeof(AssemblyLoadContext).GetProperty("All")?.GetGetMethod(),
-            typeof(Assembly).GetMethod(nameof(Assembly.GetTypes)),
-            Assembly.GetExecutingAssembly().GetType().GetMethod(nameof(Assembly.GetReferencedAssemblies))
+            typeof(AppDomain).GetMethod(nameof(AppDomain.GetAssemblies)), // Assembly[]
+            typeof(AssemblyLoadContext).GetProperty("Assemblies")?.GetGetMethod(), // IEnumerable<Assembly>
+            typeof(AssemblyLoadContext).GetProperty("All")?.GetGetMethod(), // IEnumerable<AssemblyLoadContext>
+            typeof(Assembly).GetMethod(nameof(Assembly.GetTypes)), // Type[]
+            typeof(Assembly).GetMethod(nameof(Assembly.GetType)), //Type
+            typeof(Assembly).GetProperty("DefinedTypes")?.GetGetMethod(), // IEnumerable<TypeInfo>
+            Assembly.GetExecutingAssembly().GetType().GetMethod(nameof(Assembly.GetReferencedAssemblies)) // AssemblyName[]
         ];
 
         var patchMethod = PatchHelpers.GetMethod(typeof(AssemblyHidingManager), "DetectionVectorPatcher");
@@ -85,7 +100,7 @@ public static class AssemblyHidingManager
             );
     }
 
-    private static bool ShouldHideAssembly(string ourAssemblyName)
+    public static bool ShouldHideAssembly(string ourAssemblyName)
     {
         foreach (var (hiddenAssemblyName, exact) in _hiddenAssemblies)
         {
@@ -111,40 +126,29 @@ public static class AssemblyHidingManager
     {
         foreach (var type in unhiddenTypes)
         {
-            if (ShouldHideAssembly(type.Assembly.GetName().FullName))
+            if (ShouldHideType(type))
                 continue;
 
             yield return type;
         }
     }
 
+    private static bool ShouldHideType(Type type) => ShouldHideAssembly(type.Assembly.GetName().FullName);
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void DetectionVectorPatcher(ref object __result)
     {
         // If called from framework or whatever then let it actually use the function
-        if (IsCallsiteInHiddenAssembly())
+        if (IsCallsiteThroughHiddenAssembly(2)) // ignore callsites of IsCallsiteThroughHiddenAssembly and this
             return;
 
-        // Don't let content see
-        /*
-            !! `IsCallsiteFromGame` isn't used here because it stops the game from actually initialising
-            any external mods. On the other hand `IsCallsiteInHiddenAssembly` is a bit overkill but it works here with less effort
-            than it would take to fix `IsCallsiteFromGame` not working with external mods.
-        */
-        // if (!IsCallsiteFromGame())
-        //     return;
+        if (__result == null)
+            return;
 
-        // i hate ts
         switch (__result)
         {
-            case AssemblyName[] assemblyNames:
-                __result = HideHiddenAssemblyNames(assemblyNames);
-                break;
             case Assembly[] originalAssemblies:
                 __result = originalAssemblies.Where(assembly => !ShouldHideAssembly(assembly.GetName().FullName)).ToArray();
-                break;
-            case Type[] types:
-                __result = HideHiddenTypes(types).ToArray();
                 break;
             case IEnumerable<Assembly> assemblyEnumerable:
                 __result = assemblyEnumerable.Where(assembly => !ShouldHideAssembly(assembly.GetName().FullName));
@@ -152,29 +156,74 @@ public static class AssemblyHidingManager
             case IEnumerable<AssemblyLoadContext> assemblyLoadContextEnumerable:
                 __result = assemblyLoadContextEnumerable.Where(context => context.Name != "Assembly.Load(byte[], ...)");
                 break;
+            case Type[] types:
+                __result = HideHiddenTypes(types).ToArray();
+                break;
+            case Type type:
+                if (ShouldHideType(type))
+                    __result = null!;
+
+                break;
+            case IEnumerable<TypeInfo> assemblyTypeInfos:
+                __result = assemblyTypeInfos.Where(typeInfo => !ShouldHideAssembly(typeInfo.Assembly.GetName().FullName));
+                break;
+            case AssemblyName[] assemblyNames:
+                __result = HideHiddenAssemblyNames(assemblyNames);
+                break;
             default:
                 throw new InvalidOperationException($"Bad type: {__result.GetType()}");
         }
     }
 
-    /// <returns>Whether the call-site of this method is in a currently hidden assembly.</returns>
-    public static bool IsCallsiteInHiddenAssembly()
+    /// <returns>Whether any call-site of this stack is in a currently hidden assembly, except for the first <paramref name="ignoredFirst"/> frames.</returns>
+    public static bool IsCallsiteThroughHiddenAssembly(int ignoredFirst = 2)
+    {
+        var stackTrace = new StackTrace();
+        var frames = stackTrace.GetFrames();
+        var index = 0;
+
+        foreach (var frame in frames)
+        {
+            if (++index <= ignoredFirst)
+                continue;
+
+            if (frame.GetMethod() is not { } methodInfo ||
+                methodInfo.DeclaringType is not { } declaringType)
+                continue;
+
+            if (OverridenCallsites.Contains(methodInfo))
+            {
+                Console.WriteLine($"CUROVERRIDEN: {frame.GetMethod()?.DeclaringType?.Assembly}");
+                return true;
+            }
+
+            if (ShouldHideAssembly(declaringType.Assembly.GetName().FullName))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <returns>Whether any call-site of this stack is in the given assembly.</returns>
+    public static bool IsCallsiteThroughAssembly(string assemblyName, bool exact = false)
     {
         var stackTrace = new StackTrace();
         var frames = stackTrace.GetFrames();
 
         foreach (var frame in frames)
         {
-            var method = frame.GetMethod();
-            if (method == null ||
-                method.DeclaringType == null)
+            if (frame.GetMethod() is not { } methodInfo ||
+                methodInfo.DeclaringType is not { } declaringType)
                 continue;
 
-            if (!ShouldHideAssembly(method.DeclaringType.Assembly.GetName().FullName))
-                return false;
+            var otherAssemblyName = declaringType.Assembly.GetName().FullName;
+            if (exact && otherAssemblyName == assemblyName)
+                return true;
+            else if (!exact && otherAssemblyName.Contains(assemblyName))
+                return true;
         }
 
-        return true;
+        return false;
     }
 
     /// <returns>Whether the stack-trace of this method's call-site was ever in any Robust/Content/OpenDreamShared namespace.</returns>

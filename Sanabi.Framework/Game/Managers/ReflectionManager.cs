@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace Sanabi.Framework.Game.Managers;
 
 /// <summary>
-///     Used to reflect on your actions.
+///     Used to reflect on what you've done.
 /// </summary>
 public static class ReflectionManager
 {
@@ -41,9 +41,10 @@ public static class ReflectionManager
     ///     Returns the type from it's fully qualified type-name.
     ///         Throws if not possible. Caches type for future calls if found.
     /// </summary>
+    /// <param name="except">Throw an exception if type doesnt exist.</param>
     /// <exception cref="InvalidOperationException">Thrown if the type didn't exist in the cache and could not be found via <see cref="AssemblyManager"/>.</exception>
     /// <inheritdoc cref="TryGetTypeByQualifiedName(string, out Type)"/> // inherit param
-    public static Type GetTypeByQualifiedName(string qualifiedTypeName)
+    public static Type GetTypeByQualifiedName(string qualifiedTypeName, bool except = false)
     {
         ref var cachedTypeRef = ref CollectionsMarshal.GetValueRefOrAddDefault(_cachedTypes, qualifiedTypeName, out var exists);
 
@@ -55,6 +56,10 @@ public static class ReflectionManager
 
             cachedTypeRef = assembly.GetType(qualifiedTypeName);
         }
+
+        if (except &&
+            cachedTypeRef is not { })
+            throw new InvalidOperationException($"Couldn't resolve {qualifiedTypeName}!");
 
         return cachedTypeRef!;
     }

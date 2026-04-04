@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Reflection.Emit;
+using HarmonyLib;
 using Sanabi.Framework.Misc;
 using Sanabi.Framework.Patching;
 using SS14.Launcher;
@@ -12,6 +14,7 @@ namespace Sanabi.Framework.Game.Managers;
 public static partial class AssemblyLoadingManager
 {
     private static readonly Queue<MethodInfo> _pendingEntSysManUpdateCallbacks = new();
+    private static bool _stopPretending = true;
 
     /// <summary>
     ///     Invokes a static method and enters it. The method may
@@ -79,12 +82,70 @@ public static partial class AssemblyLoadingManager
         => (bitmap & (1L << index)) != 0;
     private static void ModLoaderPostfix(ref dynamic __instance)
     {
-        //var index = 0;
+        _stopPretending = false;
         while (_dataPendingAssemblyLoad.TryDequeue(out var modData))
         {
             if (modData.Assembly != null)
                 LoadModAssemblyIntoGame(ref __instance, modData);
         }
+        _stopPretending = true;
+    }
+
+    // Dont change signature
+    private static IEnumerable<Type> TransformEntryPoints(IEnumerable<Type> originalTypes, Assembly affectedAssembly)
+    {
+        if (_stopPretending)
+            return originalTypes;
+
+        var thisMethod = (MethodInfo)MethodBase.GetCurrentMethod()!;
+        if (AssemblyHidingManager.ShouldHideAssembly(affectedAssembly.GetName().FullName))
+            return affectedAssembly.GetTypes().Where(t => _gameSharedType.IsAssignableFrom(t));
+
+        return originalTypes;
+    }
+
+    /*
+        IL_006F: call       static System.Collections.Generic.IEnumerable`1<System.Type> System.Linq.Enumerable::Where(System.Collections.Generic.IEnumerable`1<System.Type> source, System.Func`2<System.Type, System.Boolean> predicate)
+        [INSERT] ldarg.15
+        [INSERT] call TransformEntryPoints
+        IL_0074: callvirt   abstract virtual System.Collections.Generic.IEnumerator`1<System.Type> System.Collections.Generic.IEnumerable`1<System.Type>::GetEnumerator()
+        IL_0079: stloc.1
+    */
+    private static IEnumerable<CodeInstruction> ModInitTranspiler(IEnumerable<CodeInstruction> instructionsEnum)
+    {
+        var instructions = new List<CodeInstruction>(instructionsEnum);
+
+        var whereMethod = typeof(Enumerable)
+            .GetMethods()
+            .First(m => m.Name == "Where" && m.GetParameters().Length == 2)
+            .MakeGenericMethod(typeof(Type));
+
+        var overrideMethod = ((Delegate)TransformEntryPoints).Method;
+
+        for (var index = 0; index < instructions.Count; index++)
+        {
+            var instruction = instructions[index];
+            if (instruction.opcode != OpCodes.Call ||
+                !Equals(instruction.operand, whereMethod))
+                continue;
+
+            // i = ::Where(...), i+1 = ::GetEnumerator()
+
+            CodeInstruction[] addedInstr = [
+                // load first param: assembly
+                new CodeInstruction(OpCodes.Ldarg_1),
+
+                // the enumerable is already on the stack from Where call before this
+                // now call our method which takes (Assembly, IEnumerable<Type>)
+                new CodeInstruction(OpCodes.Call, ((Delegate)TransformEntryPoints).Method)
+            ];
+
+            // add after Where call
+            instructions.InsertRange(index + 1, addedInstr);
+            break;
+        }
+
+        return instructions;
     }
 
     private static void EntSysManInitPostfix()

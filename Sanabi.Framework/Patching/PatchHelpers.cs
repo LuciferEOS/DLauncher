@@ -56,9 +56,14 @@ public static partial class PatchHelpers
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public static MethodInfo? GetMethod(Type? type, string methodName, Type[]? parameters = null)
+    public static MethodInfo? GetMethod(Type? type, string methodName, Type[]? parameters = null, bool except = false)
     {
-        return AccessTools.Method(type, methodName, parameters);
+        var returnedType = AccessTools.Method(type, methodName, parameters);
+        if (except &&
+            returnedType is not { })
+            throw new InvalidOperationException($"Couldn't resolve method {methodName} on type {type?.ToString() ?? "N/A"}!");
+
+        return returnedType;
     }
 
     /// <summary>
@@ -159,7 +164,7 @@ public static partial class PatchHelpers
     /// <returns>Null if no method was found.</returns>
     // TODO: Logs
     private static MethodInfo? ResolveMethod(Type? type, string methodName, Type[]? methodParameters)
-        => GetMethod(type, methodName, methodParameters);
+        => GetMethod(type, methodName, methodParameters, except: true);
 
     /// <summary>
     ///     Tries to patch a method by the names of the necessary
@@ -217,6 +222,14 @@ public static partial class PatchHelpers
         HarmonyPatchType patchType)
     {
         TryPatchMethod(targetMethod, patchMethod, patchType);
+    }
+
+    public static void PatchMethod(
+        MethodInfo? targetMethod,
+        Delegate patchDelegate,
+        HarmonyPatchType patchType)
+    {
+        TryPatchMethod(targetMethod, patchDelegate.Method, patchType);
     }
 
     /// <summary>

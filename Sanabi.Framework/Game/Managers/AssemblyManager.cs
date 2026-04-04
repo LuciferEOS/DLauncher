@@ -76,6 +76,7 @@ public static class AssemblyManager
         {
             _fulfilled = true;
             OnAssembliesFulfilled?.Invoke();
+            Console.WriteLine($"Assembly-Mng-Fulfilled: {fulfilledCount}");
 
             return;
         }
@@ -95,7 +96,7 @@ public static class AssemblyManager
                 if (assembly.FullName?.Contains(necessaryAssemblyName) == true)
                 {
                     Assemblies[necessaryAssemblyName] = assembly;
-                    Console.WriteLine($"BruteForce-Assembly-Found: {necessaryAssemblyName}");
+                    Console.WriteLine($"Assembly-Mng-BruteForce-Found: {necessaryAssemblyName}");
                 }
             }
         }
@@ -112,7 +113,7 @@ public static class AssemblyManager
             if (loadedAssembly.FullName?.Contains(necessaryAssemblyName) == true)
             {
                 Assemblies[necessaryAssemblyName] = loadedAssembly;
-                Console.WriteLine($"Loaded-Assembly-Found: {necessaryAssemblyName}");
+                Console.WriteLine($"Assembly-Mng-Loaded-Found: {necessaryAssemblyName}");
             }
         }
 

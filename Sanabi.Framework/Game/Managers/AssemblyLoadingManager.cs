@@ -24,6 +24,7 @@ public static partial class AssemblyLoadingManager
     private static MethodInfo _modInitMethod = default!;
     private static MethodInfo _iResourceManagerAddRootsMethod = default!; // has to be interface or else it cant get called on dynamic or whatever IDFK
     private static ConstructorInfo _dirLoaderConstructorData = default!;
+    private static Type _gameSharedType = default!;
 
     /// <summary>
     ///     This is also used to identify SanabiLauncher IContentRoots.
@@ -39,15 +40,15 @@ public static partial class AssemblyLoadingManager
         if (!SanabiConfig.ProcessConfig.LoadExternalMods)
             return;
 
-        var internalModLoader = ReflectionManager.GetTypeByQualifiedName("Robust.Shared.ContentPack.ModLoader");
-        var baseModLoader = ReflectionManager.GetTypeByQualifiedName("Robust.Shared.ContentPack.BaseModLoader");
+        _gameSharedType = ReflectionManager.GetTypeByQualifiedName("Robust.Shared.ContentPack.GameShared", except: true);
+        var internalModLoader = ReflectionManager.GetTypeByQualifiedName("Robust.Shared.ContentPack.ModLoader", except: true);
+        var baseModLoader = ReflectionManager.GetTypeByQualifiedName("Robust.Shared.ContentPack.BaseModLoader", except: true);
 
-        _modInitMethod = PatchHelpers.GetMethod(internalModLoader, "InitMod")
-            ?? throw new InvalidOperationException("Couldn't resolve BaseModLoader.InitMod!");
+        _modInitMethod = PatchHelpers.GetMethod(internalModLoader, "InitMod", except: true)!;
 
         _iResourceManagerAddRootsMethod = AccessTools.Method("Robust.Shared.ContentPack.IResourceManager:AddRoot");
 
-        var sawmillImplType = ReflectionManager.GetTypeByQualifiedName("Robust.Shared.Log.LogManager+Sawmill");
+        var sawmillImplType = ReflectionManager.GetTypeByQualifiedName("Robust.Shared.Log.LogManager+Sawmill", except: true);
 
         // DEMENTED
         // `public Sawmill(Sawmill? parent, string name)`, although sawmill impl type is nullable, its notnullable here
@@ -55,26 +56,49 @@ public static partial class AssemblyLoadingManager
 
         _resPathRootValue = PatchHelpers.GetConstructorAndMakeInstance("Robust.Shared.Utility.ResPath", [typeof(string)], ["/"]);
 
-        var sawmillInterfaceType = ReflectionManager.GetTypeByQualifiedName("Robust.Shared.Log.ISawmill");
+        var sawmillInterfaceType = ReflectionManager.GetTypeByQualifiedName("Robust.Shared.Log.ISawmill", except: true)!;
 
         // (DirectoryInfo directory, ISawmill sawmill, bool checkCasing)
-        _dirLoaderConstructorData = ReflectionManager.GetTypeByQualifiedName("Robust.Shared.ContentPack.ResourceManager+DirLoader")
+        _dirLoaderConstructorData = ReflectionManager.GetTypeByQualifiedName("Robust.Shared.ContentPack.ResourceManager+DirLoader", except: true)
             .GetConstructor(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, [typeof(DirectoryInfo), sawmillInterfaceType, typeof(bool)])
                 ?? throw new InvalidOperationException("Couldn't resolve DirLoader constructor!");
 
         PatchHelpers.PatchMethod(
-            ReflectionManager.GetTypeByQualifiedName("Robust.Shared.ProgramShared"),
+            ReflectionManager.GetTypeByQualifiedName("Robust.Shared.ProgramShared", except: true),
             "DoMounts",
             DoMountsPrefix,
             HarmonyPatchType.Prefix
         );
 
         PatchHelpers.PatchMethod(
-            internalModLoader,
-            "TryLoadModules",
+            PatchHelpers.GetMethod(internalModLoader, "TryLoadModules"),
             ModLoaderPostfix,
             HarmonyPatchType.Postfix
         );
+
+        // not _modInitMethod because this is implemented on the base
+        PatchHelpers.PatchMethod(
+            ReflectionManager.GetTypeByQualifiedName("Robust.Shared.ContentPack.BaseModLoader", except: true),
+            "InitMod",
+            ModInitTranspiler,
+            HarmonyPatchType.Transpiler
+        );
+
+        PatchHelpers.PatchMethod(
+            ReflectionManager.GetTypeByQualifiedName("Robust.Shared.GameObjects.EntitySystemManager", except: true),
+            "Initialize",
+            EntSysManInitPostfix,
+            HarmonyPatchType.Postfix
+        );
+
+        var ensureGetAllTypesCacheMethod = PatchHelpers.GetMethod(
+            ReflectionManager.GetTypeByQualifiedName("Robust.Shared.Reflection.ReflectionManager", except: true),
+            "EnsureGetAllTypesCache",
+            except: true
+        )!;
+
+        // danger
+        AssemblyHidingManager.OverridenCallsites.Add(ensureGetAllTypesCacheMethod);
 
         if (!TryGetExternalMods(out var modules))
             return;
@@ -84,11 +108,11 @@ public static partial class AssemblyLoadingManager
         var index = 0;
         foreach (var module in modules)
         {
-            SanabiLogger.LogInfo($"Considering to load mod `{module.Name}`");
+            SanabiLogger.LogInfo($"ASMLOAD: Considering to load mod `{module.Name}`");
             if (!GetIsModEnabled(SanabiConfig.ProcessConfig.LoadedExternalModsFlags, index++))
                 continue;
 
-            SanabiLogger.LogInfo($"Loading mod `{module.Name}`");
+            SanabiLogger.LogInfo($"ASMLOAD: Loading mod `{module.Name}`");
             module.Initialise();
 
             _dataPendingAssemblyLoad.Enqueue(module);
