@@ -32,13 +32,6 @@ public static class BetterFullscreenPatch
 
         PatchHelpers.PatchMethod(
             WindowingImplType,
-            "WindowCreate",
-            WindowCreatePostfix, // ironic
-            HarmonyPatchType.Postfix
-        );
-
-        PatchHelpers.PatchMethod(
-            WindowingImplType,
             "UpdateMainWindowMode",
             PrefixUpdateMainWindowMode,
             HarmonyPatchType.Prefix
@@ -50,12 +43,19 @@ public static class BetterFullscreenPatch
             SharedWindowCreatePrefix,
             HarmonyPatchType.Prefix
         );
+
+        PatchHelpers.PatchMethod(
+            _clydeType,
+            "SharedWindowCreate",
+            SharedWindowCreatePostfix,
+            HarmonyPatchType.Postfix
+        );
     }
 
-    // So that fullscreen status updates, yes very ironic
-    private static void WindowCreatePostfix(ref object __instance) => PrefixUpdateMainWindowMode(ref __instance);
-
     private static void SharedWindowCreatePrefix(ref object __instance) => _clyde = __instance;
+
+    // So that fullscreen status updates after mainwindow is possibly set, yes very ironic
+    private static void SharedWindowCreatePostfix(ref object __instance) => PrefixUpdateMainWindowMode(ref __instance);
 
     private static readonly FieldInfo _clyde_mainWindow = _clydeType.GetField("_mainWindow", BindingFlags.Instance | BindingFlags.NonPublic)!;
     private static dynamic? GetMainWindow() => _clyde_mainWindow.GetValue(_clyde);
