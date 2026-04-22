@@ -107,6 +107,7 @@ internal class Program
             PatchEntryAttributeManager.ProcessRunLevel(PatchRunLevel.Engine);
             AssemblyManager.OnAssembliesFulfilled += ContentRunLevelAct;
 
+            // Idk why this is after everything and it really shouldnt be but shit breaks if its not after everything. HEEELP
             AssemblyManager.QueryAssemblies();
             AssemblyManager.Subscribe();
         }

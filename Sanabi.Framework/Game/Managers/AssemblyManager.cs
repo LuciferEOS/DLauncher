@@ -25,7 +25,12 @@ public static class AssemblyManager
     private static bool _fulfilled = false;
 
     /// <summary>
-    ///     Located assemblies.
+    ///     All assemblies ever found.
+    /// </summary>
+    public static readonly Dictionary<string, Assembly> AssembliesIncludingUnnecessary = [];
+
+    /// <summary>
+    ///     Located necessary assemblies.
     /// </summary>
     public static readonly Dictionary<string, Assembly> Assemblies = [];
 
@@ -44,10 +49,11 @@ public static class AssemblyManager
 #pragma warning restore CA2211
 
     /// <summary>
-    ///     Tries to retrieve an assembly from cache.
+    ///     Tries to retrieve an assembly from cache. Can switch between <see cref="Assemblies"/> and
+    ///         <see cref="AssembliesIncludingUnnecessary"/>.
     /// </summary>
-    public static bool TryGetAssembly(string assemblyName, [MaybeNullWhen(false)] out Assembly assembly)
-        => Assemblies.TryGetValue(assemblyName, out assembly);
+    public static bool TryGetAssembly(string assemblyName, [MaybeNullWhen(false)] out Assembly assembly, bool includeUnnecessary = false)
+        => (includeUnnecessary ? AssembliesIncludingUnnecessary : Assemblies).TryGetValue(assemblyName, out assembly);
 
     /// <summary>
     ///     Runs a callback once ever when the given assembly gets loaded.
@@ -55,7 +61,7 @@ public static class AssemblyManager
     /// </summary>
     public static void SubscribeSpecificAssemblyOnce(string assemblyName, Action<Assembly> callback)
     {
-        if (TryGetAssembly(assemblyName, out var existingAssembly))
+        if (TryGetAssembly(assemblyName, out var existingAssembly, includeUnnecessary: true))
         {
             callback.Invoke(existingAssembly);
             return;
@@ -117,14 +123,28 @@ public static class AssemblyManager
     {
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
+            if (assembly.GetName().Name is not { } name)
+                continue;
+
+            AssembliesIncludingUnnecessary[name] = assembly;
+
             foreach (var necessaryAssemblyName in _necessaryAssemblyNames)
             {
-                if (assembly.GetName().Name?.Contains(necessaryAssemblyName) == true)
+                if (name.Contains(necessaryAssemblyName) == true)
                 {
                     Assemblies[necessaryAssemblyName] = assembly;
                     Console.WriteLine($"Assembly-Mng-BruteForce-Found: {necessaryAssemblyName}");
                 }
             }
+        }
+
+        foreach (var (assemblyCallbackKey, assemblyCallbacks) in SpecificAssemblyCallbacks)
+        {
+            if (!AssembliesIncludingUnnecessary.TryGetValue(assemblyCallbackKey, out var callbackAssembly))
+                continue;
+
+            foreach (var assemblyCallback in assemblyCallbacks)
+                assemblyCallback.Invoke(callbackAssembly);
         }
 
         CheckFulfillment();
@@ -133,19 +153,21 @@ public static class AssemblyManager
     private static void OnAssemblyLoad(object? sender, AssemblyLoadEventArgs args)
     {
         var loadedAssembly = args.LoadedAssembly;
-        var assemblyName = loadedAssembly.GetName().Name;
+        if (loadedAssembly.GetName().Name is not { } assemblyName)
+            return;
+
+        AssembliesIncludingUnnecessary[assemblyName] = loadedAssembly;
 
         foreach (var necessaryAssemblyName in _necessaryAssemblyNames)
         {
-            if (assemblyName?.Contains(necessaryAssemblyName) == true)
+            if (assemblyName.Contains(necessaryAssemblyName) == true)
             {
                 Assemblies[necessaryAssemblyName] = loadedAssembly;
                 Console.WriteLine($"Assembly-Mng-Loaded-Found: {necessaryAssemblyName}");
             }
         }
 
-        if (assemblyName is { } &&
-            SpecificAssemblyCallbacks.TryGetValue(assemblyName, out var callbacks))
+        if (SpecificAssemblyCallbacks.TryGetValue(assemblyName, out var callbacks))
         {
             foreach (var callback in callbacks)
                 callback.Invoke(loadedAssembly);
