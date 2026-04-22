@@ -11,10 +11,13 @@ namespace Sanabi.Framework.Game.Patches;
 ///     Gives you borderless windowed on SDL3
 /// </summary>
 // Be careful...
+
+// There is a small issue with this that i THINK it causes screen to flicker black when starting. But eh who cares
 public static class BetterFullscreenPatch
 {
     public static bool Enabled => SanabiConfig.ProcessConfig.RunBetterFullscreenPatch;
     private static dynamic _clyde = null!;
+    private static dynamic _windowingImpl = null!;
 
     private static readonly Type WindowingImplType = ReflectionManager.GetTypeByQualifiedName("Robust.Client.Graphics.Clyde.Clyde+Sdl3WindowingImpl", except: true);
     private static readonly MethodInfo SendCmdMethod = PatchHelpers.GetMethod(WindowingImplType, "SendCmd")!;
@@ -32,30 +35,41 @@ public static class BetterFullscreenPatch
 
         PatchHelpers.PatchMethod(
             WindowingImplType,
+            "WindowCreate",
+            WindowCreatePrefix,
+            HarmonyPatchType.Prefix
+        );
+
+        PatchHelpers.PatchMethod(
+            WindowingImplType,
             "UpdateMainWindowMode",
             PrefixUpdateMainWindowMode,
             HarmonyPatchType.Prefix
         );
 
-        PatchHelpers.PatchMethod(
+        PatchHelpers.PatchConstructor(
             _clydeType,
-            "SharedWindowCreate",
-            SharedWindowCreatePrefix,
+            ClydeConstructorPrefix,
             HarmonyPatchType.Prefix
         );
 
         PatchHelpers.PatchMethod(
             _clydeType,
-            "SharedWindowCreate",
-            SharedWindowCreatePostfix,
+            "TryInitMainWindow",
+            TryInitMainWindowPostfix,
             HarmonyPatchType.Postfix
         );
     }
 
-    private static void SharedWindowCreatePrefix(ref object __instance) => _clyde = __instance;
+    private static void WindowCreatePrefix(ref object __instance) => _windowingImpl = __instance;
+    private static bool PrefixUpdateMainWindowMode(ref object __instance)
+    {
+        DoMainWindowUpdate(__instance);
+        return false;
+    }
 
-    // So that fullscreen status updates after mainwindow is possibly set, yes very ironic
-    private static void SharedWindowCreatePostfix(ref object __instance) => PrefixUpdateMainWindowMode(ref __instance);
+    private static void ClydeConstructorPrefix(ref object __instance) => _clyde = __instance;
+    private static void TryInitMainWindowPostfix() => DoMainWindowUpdate(_windowingImpl, saveSize: false);
 
     private static readonly FieldInfo _clyde_mainWindow = _clydeType.GetField("_mainWindow", BindingFlags.Instance | BindingFlags.NonPublic)!;
     private static dynamic? GetMainWindow() => _clyde_mainWindow.GetValue(_clyde);
@@ -96,22 +110,26 @@ public static class BetterFullscreenPatch
     private static void SetPrevWindowPos(object windowReg, dynamic val) => windowRegPrevWindowPos.SetValue(windowReg, val);
 
     private static bool WasSdlBound = false;
-    private static bool PrefixUpdateMainWindowMode(ref object __instance)
+    private static void DoMainWindowUpdate(object windowingImpl, bool saveSize = true)
     {
         var mainWindow = GetMainWindow();
         if (mainWindow == null)
-            return false;
+            return;
 
         if (!WasSdlBound)
         {
+            // Patching this onto Sdl3WindowingImpl.InitSdl3 didn't work for some reason i dgaf to understand so here it goes
             WasSdlBound = true;
             SDL.BindSdl();
         }
 
         if (GetWindowMode() == TruncatedClydeWindowMode.Fullscreen)
         {
-            SetPrevWindowSize(mainWindow, GetWindowSize(mainWindow));
-            SetPrevWindowPos(mainWindow, GetWindowPos(mainWindow));
+            if (saveSize)
+            {
+                SetPrevWindowSize(mainWindow, GetWindowSize(mainWindow));
+                SetPrevWindowPos(mainWindow, GetWindowPos(mainWindow));
+            }
 
             var displayIndex = (uint)GetBiggestDisplayThatWindowIsIn(mainWindow);
             SDL.SDL_GetDisplayBounds(displayIndex, out var bounds);
@@ -123,7 +141,7 @@ public static class BetterFullscreenPatch
                 bounds.x,
                 bounds.y
             );
-            SendCmdMethod.Invoke(__instance, [cmd]);
+            SendCmdMethod.Invoke(windowingImpl, (object[])[cmd]);
         }
         else
         {
@@ -137,11 +155,10 @@ public static class BetterFullscreenPatch
                 prevWindowPos.X,
                 prevWindowPos.Y
             );
-            SendCmdMethod.Invoke(__instance, [cmd]);
+            SendCmdMethod.Invoke(windowingImpl, (object[])[cmd]);
         }
 
         SDL.SDL_SetWindowBordered(GetWindowHwnd(mainWindow), false);
-        return false;
     }
 
     /// <summary>

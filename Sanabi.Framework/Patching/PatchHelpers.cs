@@ -193,6 +193,31 @@ public static partial class PatchHelpers
     /// <summary>
     ///     Tries to patch a method by the names of the necessary
     ///         class and method. However, the patch method
+    ///         and target class are already defined.
+    ///
+    ///     The delegate must not be a lambda expression, as if so
+    ///         then an <see cref="InvalidProgramException"/> will be thrown.
+    /// </summary>
+    /// <param name="targetQualifiedTypeName">Fully qualified type-name of the target class.</param>
+    /// <param name="targetMethodName">Name of the target method.</param>
+    /// <param name="patchDelegate">The patch method.</param>
+    /// <param name="patchType">How the patch will be applied.</param>
+    /// <param name="targetMethodParameters">Parameters taken by the target method.</param>
+    public static void PatchConstructor(
+        Type targetClass,
+        Delegate patchDelegate,
+        HarmonyPatchType patchType,
+        Type[]? targetMethodParameters = null)
+    {
+        var targetMethod = targetClass.GetConstructor(targetMethodParameters ?? []) ??
+            throw new ArgumentException($"No constructor for type {targetClass} matches the given arguments!");
+
+        TryPatchMethod(targetMethod, patchDelegate.Method, patchType);
+    }
+
+    /// <summary>
+    ///     Tries to patch a method by the names of the necessary
+    ///         class and method. However, the patch method
     ///         is already defined.
     /// </summary>
     /// <param name="targetQualifiedTypeName">Fully qualified type-name of the target class.</param>
@@ -207,11 +232,8 @@ public static partial class PatchHelpers
         HarmonyPatchType patchType,
         Type[]? targetMethodParameters = null)
     {
-        if (!ReflectionManager.TryGetTypeByQualifiedName(targetQualifiedTypeName, out var targetClass))
-            return;
-
         PatchMethod(
-            targetClass,
+            ReflectionManager.GetTypeByQualifiedName(targetQualifiedTypeName),
             targetMethodName,
             patchDelegate,
             patchType,
