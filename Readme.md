@@ -2,13 +2,14 @@ SanabiLauncher is a fork of the launcher for SS14.
 
 TODO:
 - [ ] API for mods to evade screengrabbing measures
+- [ ] Test whether windowed-borderless mode actually works on linux
 
 Features include:
 - Patchloader, with mod template here https://github.com/LaCumbiaDelCoronavirus/TemplateSanabiMod
 - Compatible with [Marseyloader](https://github.com/ValidHunters/Marseyloader) patches [(example here)](https://github.com/ValidHunters/SubversionExamplePatch)
 - - Comes with built-in patches including but not limited to:
 - - - HWId spoof patch
-    - Patch to replace RT's built-in fullscreen mode with a borderless-windowed mode
+    - Patch to replace RT's built-in fullscreen mode with a borderless-windowed mode. Will crash your game on any OS other than windows/linux.
 - - Support for externally-loaded mod assemblies (`.dll`s, see button to open patch directory somewhere in Sanabi tab), can be selectively loaded (maximum of 64 mods in directory)
   - Support for externally-loaded resources
   - Support for all of that, compressed into a `.zip`
