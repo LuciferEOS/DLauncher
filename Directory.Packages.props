@@ -52,5 +52,8 @@
   <!-- Sanabi -->
   <ItemGroup>
     <PackageVersion Include="Lib.Harmony" Version="2.4.2" />
+
+    <!-- Required for BetterFullscreenPatch -->
+    <PackageVersion Include="SpaceWizards.Sdl" Version="1.1.1" />
   </ItemGroup>
 </Project>

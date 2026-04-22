@@ -20,11 +20,11 @@ public record struct SanabiConfig()
     public PatchRunLevel PatchRunLevel = PatchRunLevel.None;
 
     public bool RunHwidPatch = true;
+    public bool RunBetterFullscreenPatch = true;
 
     public ulong HwidPatchSeed = 1ul;
 
     public bool LoadInternalMods = false;
-
     public bool LoadExternalMods = false;
 
     public bool WaitForDebugger = false;
@@ -46,6 +46,7 @@ public static class SanabiConfigExtensions
             PatchRunLevel.None;
 
         config.RunHwidPatch = dataManager.GetCVar(SanabiCVars.HwidPatchEnabled);
+        config.RunHwidPatch = dataManager.GetCVar(SanabiCVars.BetterFullscreenPatchEnabled);
         config.HwidPatchSeed = BitConverter.ToUInt64(BitConverter.GetBytes(dataManager.GetActiveAccountCVarOrDefault(SanabiAccountCVars.SpoofingSeed)), 0);
         config.LoadInternalMods = dataManager.GetCVar(SanabiCVars.LoadInternalMods);
         config.LoadExternalMods = dataManager.GetCVar(SanabiCVars.LoadExternalMods);

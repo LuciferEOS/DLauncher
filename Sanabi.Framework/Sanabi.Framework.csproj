@@ -15,5 +15,8 @@
     <ItemGroup>
         <PackageReference Include="JetBrains.Annotations" />
         <PackageReference Include="Lib.Harmony" />
+
+        <!-- Required for BetterFullscreenPatch -->
+        <PackageReference Include="SpaceWizards.Sdl" PrivateAssets="compile" />
     </ItemGroup>
 </Project>

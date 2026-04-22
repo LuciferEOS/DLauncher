@@ -23,6 +23,12 @@ public static partial class SanabiCVars
     public static readonly CVarDef<bool> HwidPatchEnabled = CVarDef.Create("HwidPatchEnabled", true);
 
     /// <summary>
+    ///     Is the patch for loading better fullscreen (patch normal RT fullscreen into borderless windowed)
+    ///         loaded?
+    /// </summary>
+    public static readonly CVarDef<bool> BetterFullscreenPatchEnabled = CVarDef.Create("BetterFullscreenPatchEnabled", false);
+
+    /// <summary>
     ///     Load internal patches that come with the launcher?
     /// </summary>
     public static readonly CVarDef<bool> LoadInternalMods = CVarDef.Create("LoadInternalMods", false);

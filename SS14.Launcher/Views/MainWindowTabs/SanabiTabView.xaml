@@ -62,6 +62,15 @@
                    Text="Patches out HWID to be spoofed when connecting to a server. Only applies if engine patching is enabled. Based on the account's seed configured in the config."
                    Margin="8"/>
 
+        <CheckBox VerticalAlignment="Center"
+                  Margin="4"
+                  IsChecked="{Binding BetterFullscreenPatchEnabled}"
+                  Content="Borderless windowed as fullscreen patch"/>
+        <TextBlock VerticalAlignment="Center"
+                   TextWrapping="Wrap"
+                   Text="Patches out RT's implementation of fullscreen and converts it to be borderless windowed. Only applies if engine patching is enabled. May fix your screen flickering when moving out of focus. Might only work on Windows, make a bug report if it doesn't."
+                   Margin="8"/>
+
         <Separator Classes="horizontal"
                    Margin="0,5,0,5"/>
 

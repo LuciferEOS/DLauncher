@@ -170,6 +170,9 @@ public static partial class PatchHelpers
     ///     Tries to patch a method by the names of the necessary
     ///         class and method. However, the patch method
     ///         and target class are already defined.
+    ///
+    ///     The delegate must not be a lambda expression, as if so
+    ///         then an <see cref="InvalidProgramException"/> will be thrown.
     /// </summary>
     /// <param name="targetQualifiedTypeName">Fully qualified type-name of the target class.</param>
     /// <param name="targetMethodName">Name of the target method.</param>

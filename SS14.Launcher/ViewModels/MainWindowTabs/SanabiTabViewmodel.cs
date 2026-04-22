@@ -88,6 +88,12 @@ public class SanabiTabViewModel : MainWindowTabViewModel
         set => SetAndCommitCvar(SanabiCVars.HwidPatchEnabled, value);
     }
 
+    public bool BetterFullscreenPatchEnabled
+    {
+        get => Cfg.GetCVar(SanabiCVars.BetterFullscreenPatchEnabled);
+        set => SetAndCommitCvar(SanabiCVars.BetterFullscreenPatchEnabled, value);
+    }
+
     public bool LoadInternalMods
     {
         get => Cfg.GetCVar(SanabiCVars.LoadInternalMods);

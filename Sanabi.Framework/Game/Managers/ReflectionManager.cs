@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using HarmonyLib;
 
 namespace Sanabi.Framework.Game.Managers;
 
@@ -25,11 +26,16 @@ public static class ReflectionManager
         if (_cachedTypes.TryGetValue(qualifiedTypeName, out type))
             return true;
 
-        var typePrefixAssembly = ExtractTypePrefix(qualifiedTypeName);
-        if (AssemblyManager.TryGetAssembly(typePrefixAssembly, out var assembly) &&
+        if (AssemblyManager.TryGetAssembly(ExtractTypePrefix(qualifiedTypeName), out var assembly) &&
             assembly.GetType(qualifiedTypeName) is { } foundType)
         {
             _cachedTypes[qualifiedTypeName] = type = foundType;
+            return true;
+        }
+
+        if (AccessTools.TypeByName(qualifiedTypeName) is { } accessFoundType)
+        {
+            _cachedTypes[qualifiedTypeName] = type = accessFoundType;
             return true;
         }
 
@@ -50,11 +56,12 @@ public static class ReflectionManager
 
         if (!exists)
         {
-            var typePrefixAssembly = ExtractTypePrefix(qualifiedTypeName);
-            if (!AssemblyManager.TryGetAssembly(typePrefixAssembly, out var assembly))
-                throw new InvalidOperationException($"Couldn't locate qualified type \"{qualifiedTypeName}\" in assembly {typePrefixAssembly}!");
-
-            cachedTypeRef = assembly.GetType(qualifiedTypeName);
+            if (AssemblyManager.TryGetAssembly(ExtractTypePrefix(qualifiedTypeName), out var assembly))
+                cachedTypeRef = assembly.GetType(qualifiedTypeName);
+            else if (AccessTools.TypeByName(qualifiedTypeName) is { } foundType)
+                cachedTypeRef = foundType;
+            else
+                throw new InvalidOperationException($"Couldn't locate qualified type \"{qualifiedTypeName}\"!");
         }
 
         if (except &&
@@ -67,6 +74,10 @@ public static class ReflectionManager
     /// <summary>
     ///     Given something like `Content.Client.Admin`,
     ///         this returns `Content.Client`.
+    ///
+    ///     Purely for easier searching with SS14 based assemblies,
+    ///         where first 2 words of the namespace are usually the
+    ///         assembly name too
     /// </summary>
     private static string ExtractTypePrefix(string path)
     {
