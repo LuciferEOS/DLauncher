@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace Sanabi.Framework.Game.Managers;
 
@@ -26,7 +27,13 @@ public static class AssemblyManager
     /// <summary>
     ///     Located assemblies.
     /// </summary>
-    public static readonly Dictionary<string, Assembly> Assemblies = new();
+    public static readonly Dictionary<string, Assembly> Assemblies = [];
+
+    /// <summary>
+    ///     Assembly names and list of actions that should be invoked when they
+    ///         get loaded.
+    /// </summary>
+    public static readonly Dictionary<string, List<Action<Assembly>>> SpecificAssemblyCallbacks = new();
 
     /// <summary>
     ///     Called once when every necessary assembly has
@@ -41,6 +48,25 @@ public static class AssemblyManager
     /// </summary>
     public static bool TryGetAssembly(string assemblyName, [MaybeNullWhen(false)] out Assembly assembly)
         => Assemblies.TryGetValue(assemblyName, out assembly);
+
+    /// <summary>
+    ///     Runs a callback once ever when the given assembly gets loaded.
+    ///         The callback is run immediately if already loaded.
+    /// </summary>
+    public static void SubscribeSpecificAssemblyOnce(string assemblyName, Action<Assembly> callback)
+    {
+        if (TryGetAssembly(assemblyName, out var existingAssembly))
+        {
+            callback.Invoke(existingAssembly);
+            return;
+        }
+
+        ref var reference = ref CollectionsMarshal.GetValueRefOrAddDefault(SpecificAssemblyCallbacks, assemblyName, out var callbacksExist);
+        if (!callbacksExist)
+            reference = [];
+
+        reference!.Add(callback);
+    }
 
     /// <summary>
     ///     Subscribes to assembly loads to look
@@ -93,7 +119,7 @@ public static class AssemblyManager
         {
             foreach (var necessaryAssemblyName in _necessaryAssemblyNames)
             {
-                if (assembly.FullName?.Contains(necessaryAssemblyName) == true)
+                if (assembly.GetName().Name?.Contains(necessaryAssemblyName) == true)
                 {
                     Assemblies[necessaryAssemblyName] = assembly;
                     Console.WriteLine($"Assembly-Mng-BruteForce-Found: {necessaryAssemblyName}");
@@ -107,14 +133,24 @@ public static class AssemblyManager
     private static void OnAssemblyLoad(object? sender, AssemblyLoadEventArgs args)
     {
         var loadedAssembly = args.LoadedAssembly;
+        var assemblyName = loadedAssembly.GetName().Name;
 
         foreach (var necessaryAssemblyName in _necessaryAssemblyNames)
         {
-            if (loadedAssembly.FullName?.Contains(necessaryAssemblyName) == true)
+            if (assemblyName?.Contains(necessaryAssemblyName) == true)
             {
                 Assemblies[necessaryAssemblyName] = loadedAssembly;
                 Console.WriteLine($"Assembly-Mng-Loaded-Found: {necessaryAssemblyName}");
             }
+        }
+
+        if (assemblyName is { } &&
+            SpecificAssemblyCallbacks.TryGetValue(assemblyName, out var callbacks))
+        {
+            foreach (var callback in callbacks)
+                callback.Invoke(loadedAssembly);
+
+            SpecificAssemblyCallbacks.Remove(assemblyName);
         }
 
         CheckFulfillment();

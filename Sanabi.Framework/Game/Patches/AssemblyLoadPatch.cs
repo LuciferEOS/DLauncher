@@ -27,7 +27,7 @@ public static class AssemblyLoadPatch
     private static void Prefix(Assembly assembly)
     {
         // If it doesn't have a fullname then we probably don't care whatever.
-        if (assembly.FullName is not { } fullName)
+        if (assembly.GetName().Name is not { } fullName)
             return;
 
         Console.WriteLine($"Intercepted assembly: {fullName}");

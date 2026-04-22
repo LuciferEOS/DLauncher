@@ -17,6 +17,6 @@
         <PackageReference Include="Lib.Harmony" />
 
         <!-- Required for BetterFullscreenPatch -->
-        <PackageReference Include="SpaceWizards.Sdl" PrivateAssets="compile" />
+        <!-- <PackageReference Include="SpaceWizards.Sdl" PrivateAssets="compile" /> -->
     </ItemGroup>
 </Project>
