@@ -2,7 +2,9 @@ SanabiLauncher is a fork of the launcher for SS14.
 
 TODO:
 - [ ] API for mods to evade screengrabbing measures
-- [ ] Test whether windowed-borderless mode actually works on linux
+- [x] Test whether windowed-borderless mode actually works on linux
+- - Tested: it doesn't work
+  - **LINUX GODS**: Try downloading SDL3 library (`sudo apt install libsdl3-dev`, etc.) *into* the launcher directory OR making a symlink to an existing instance of SDL3 in the launcher folder. Launcher folder may be where you installed it, maybe there but `/bin`, who knows.
 
 Features include:
 - Patchloader, with mod template here https://github.com/LaCumbiaDelCoronavirus/TemplateSanabiMod
