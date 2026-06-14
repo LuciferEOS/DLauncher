@@ -32,22 +32,16 @@ internal static partial class SDL
 
     internal static nint GetSdlHandle()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return NativeWin.GetModuleHandleOrNullIfZero("SDL3.dll") ??
-                throw new InvalidOperationException("Tried to get handle for SDL3.dll as a loaded module, but could not do so!");
-        }
+        // DLauncher start - linux support
+        if (NativeLibrary.TryLoad("SDL3", out var handle))
+            return handle;
 
         if (OperatingSystem.IsLinux())
         {
-            // Try common SONAME variants
-            var h =
-                NativeLinux.DlopenOrNullIfZero("libSDL3.so.0", NativeLinux.RTLD_NOLOAD) ??
-                NativeLinux.DlopenOrNullIfZero("libSDL3.so", NativeLinux.RTLD_NOLOAD) ??
-                throw new InvalidOperationException("Tried to get handle for SDL3.dll as a loaded module, but could not do so!");
-
-            return h;
+            if (NativeLibrary.TryLoad("libSDL3.so.0", out handle)) return handle;
+            if (NativeLibrary.TryLoad("libSDL3.so", out handle)) return handle;
         }
+        // DLauncher end - linux support
 
         throw new PlatformNotSupportedException("Your platform is too inferior for me to consider even trying to make it work here");
     }
