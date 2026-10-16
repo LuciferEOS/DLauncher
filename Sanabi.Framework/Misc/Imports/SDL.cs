@@ -36,22 +36,46 @@ internal static partial class SDL
 
     internal static nint GetSdlHandle()
     {
-        string[] names;
-        if (OperatingSystem.IsWindows())
-            names = ["SDL3.dll"];
-        else if (OperatingSystem.IsLinux())
-            names = ["libSDL3.so.0", "libSDL3.so"];
-        else if (OperatingSystem.IsMacOS())
-            names = ["libSDL3.0.dylib", "libSDL3.dylib"];
-        else
-            throw new PlatformNotSupportedException("Your platform is too inferior for me to consider even trying to make it work here");
+        // sanab version (master)
+        // TIP FOR FUTURE ME IF YOU CARE:
+        // REPLACE THIS WITH ACTUAL MASTER CODE PLS
+        /*
+         * string[] names;
+           if (OperatingSystem.IsWindows())
+               names = ["SDL3.dll"];
+           else if (OperatingSystem.IsLinux())
+               names = ["libSDL3.so.0", "libSDL3.so"];
+           else if (OperatingSystem.IsMacOS())
+               names = ["libSDL3.0.dylib", "libSDL3.dylib"];
+           else
+               throw new PlatformNotSupportedException("Your platform is too inferior for me to consider even trying to make it work here");
 
-        // Returns the handle of the already loaded library if it's loaded
-        foreach (var name in names)
+           // Returns the handle of the already loaded library if it's loaded
+           foreach (var name in names)
+           {
+               if (NativeLibrary.TryLoad(name, out var handle))
+                   return handle;
+           }
+         */
+        if (OperatingSystem.IsWindows())
         {
-            if (NativeLibrary.TryLoad(name, out var handle))
-                return handle;
+            return NativeWin.GetModuleHandleOrNullIfZero("SDL3.dll") ??
+                throw new InvalidOperationException("Tried to get handle for SDL3.dll as a loaded module, but could not do so!");
         }
+
+        if (OperatingSystem.IsLinux())
+        {
+            // Try common SONAME variants
+            var h =
+                NativeLinux.DlopenOrNullIfZero("libSDL3.so.0", NativeLinux.RTLD_NOLOAD) ??
+                NativeLinux.DlopenOrNullIfZero("libSDL3.so", NativeLinux.RTLD_NOLOAD) ??
+                throw new InvalidOperationException("Tried to get handle for SDL3.dll as a loaded module, but could not do so!");
+
+            return h;
+        }
+
+        throw new PlatformNotSupportedException("Your platform is too inferior for me to consider even trying to make it work here");
+    }
 
         throw new InvalidOperationException($"Tried to get handle for SDL3 as a loaded module, but could not do so! Tried: {string.Join(", ", names)}");
     }
