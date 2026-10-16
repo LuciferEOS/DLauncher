@@ -74,9 +74,6 @@ internal static partial class SDL
             return h;
         }
 
-        throw new PlatformNotSupportedException("Your platform is too inferior for me to consider even trying to make it work here");
-    }
-
         throw new InvalidOperationException($"Tried to get handle for SDL3 as a loaded module, but could not do so! Tried: {string.Join(", ", names)}");
     }
 
