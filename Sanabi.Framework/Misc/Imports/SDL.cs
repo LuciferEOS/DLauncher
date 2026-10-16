@@ -65,16 +65,15 @@ internal static partial class SDL
 
         if (OperatingSystem.IsLinux())
         {
-            // Try common SONAME variants
             var h =
-                NativeLinux.DlopenOrNullIfZero("libSDL3.so.0", NativeLinux.RTLD_NOLOAD) ??
-                NativeLinux.DlopenOrNullIfZero("libSDL3.so", NativeLinux.RTLD_NOLOAD) ??
+                NativeLibrary.TryLoad("libSDL3.so.0", out var versionedHandle) ? versionedHandle :
+                NativeLibrary.TryLoad("libSDL3.so", out var handle) ? handle :
                 throw new InvalidOperationException("Tried to get handle for SDL3.dll as a loaded module, but could not do so!");
 
             return h;
         }
 
-        throw new InvalidOperationException($"Tried to get handle for SDL3 as a loaded module, but could not do so! Tried: {string.Join(", ", names)}");
+        throw new PlatformNotSupportedException("SDL3 is only supported on Windows and Linux.");
     }
 
     // bool SDL_GetDisplayBounds(SDL_DisplayID displayID, SDL_Rect *rect)
